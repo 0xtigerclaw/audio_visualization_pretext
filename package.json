@@ -1,0 +1,16 @@
+{
+  "name": "music-viz-pretext",
+  "version": "1.0.0",
+  "description": "Music visualization with synced lyrics powered by @chenglou/pretext",
+  "type": "module",
+  "scripts": {
+    "dev": "npx vite",
+    "build": "npx vite build"
+  },
+  "dependencies": {
+    "@chenglou/pretext": "^0.0.3"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}

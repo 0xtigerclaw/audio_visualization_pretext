@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Music Visualizer</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Space+Mono:wght@400;700&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0a0f;
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #viz-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+    }
+
+    .controls {
+      position: fixed;
+      bottom: 32px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .controls .row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .drop-zone {
+      border: 2px dashed rgba(255, 255, 255, 0.2);
+      border-radius: 16px;
+      padding: 20px 40px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(10px);
+    }
+
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: rgba(255, 255, 255, 0.5);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .drop-zone p {
+      font-size: 14px;
+      opacity: 0.6;
+      font-weight: 300;
+    }
+
+    .drop-zone .title {
+      font-size: 16px;
+      opacity: 1;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    #file-input, #lyrics-file-input { display: none; }
+
+    button {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+      padding: 10px 24px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+      transition: all 0.2s ease;
+    }
+
+    button:hover {
+      background: rgba(255, 255, 255, 0.18);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    button:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    button.small {
+      padding: 6px 16px;
+      font-size: 12px;
+      border-radius: 8px;
+    }
+
+    .now-playing {
+      font-size: 13px;
+      opacity: 0.5;
+      font-weight: 300;
+      letter-spacing: 0.5px;
+    }
+
+    .lyrics-status {
+      font-size: 11px;
+      opacity: 0.35;
+      font-weight: 300;
+      font-family: 'Space Mono', monospace;
+      letter-spacing: 0.3px;
+    }
+
+    .seek-bar {
+      width: 300px;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .seek-bar::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    /* Lyrics paste modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: rgba(20, 20, 30, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 28px;
+      width: 480px;
+      max-height: 70vh;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .modal h3 {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .modal p {
+      font-size: 12px;
+      opacity: 0.5;
+      font-weight: 300;
+      line-height: 1.5;
+    }
+
+    .modal textarea {
+      width: 100%;
+      height: 200px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      color: #fff;
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      padding: 14px;
+      resize: vertical;
+      outline: none;
+    }
+
+    .modal textarea:focus {
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .modal .row {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="viz-canvas"></canvas>
+
+  <div class="controls">
+    <div class="drop-zone" id="drop-zone">
+      <p class="title">Drop audio + lyrics files here</p>
+      <p>.mp3/.wav/.ogg/.flac + optional .lrc/.txt lyrics</p>
+    </div>
+    <input type="file" id="file-input" accept="audio/*" />
+    <input type="file" id="lyrics-file-input" accept=".lrc,.txt" />
+    <span class="now-playing" id="now-playing"></span>
+    <span class="lyrics-status" id="lyrics-status"></span>
+    <input type="range" class="seek-bar" id="seek-bar" min="0" max="100" value="0" step="0.1" />
+    <div class="row">
+      <button id="btn-play" disabled>Play</button>
+      <button id="btn-pause" disabled>Pause</button>
+      <button id="btn-lyrics" class="small">Load Lyrics</button>
+      <button id="btn-paste-lyrics" class="small">Paste Lyrics</button>
+    </div>
+  </div>
+
+  <!-- Lyrics paste modal -->
+  <div class="modal-overlay" id="lyrics-modal">
+    <div class="modal">
+      <h3>Paste Lyrics</h3>
+      <p>
+        Paste timed LRC lyrics or plain text (one line per line).<br>
+        LRC format: [00:12.34] Lyric line here<br>
+        Plain text lines get evenly distributed across the song duration.<br>
+        Wrap a line with *asterisks* to mark it as emphasis.
+      </p>
+      <textarea id="lyrics-textarea" placeholder="[00:05.00] First line of the song
+[00:10.50] Second line with timing
+[00:15.00] *Emphasized chorus line*
+
+— or just paste plain text —
+
+First line
+Second line
+*Chorus line*"></textarea>
+      <div class="row">
+        <button id="btn-modal-cancel" class="small">Cancel</button>
+        <button id="btn-modal-apply">Apply Lyrics</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
